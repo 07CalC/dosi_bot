@@ -1,8 +1,9 @@
 import discord
 from discord.ext import commands
+import os
 
-# Replace with your bot token
-BOT_TOKEN = 'YOUR_BOT_TOKEN'
+# Get bot token from environment variable
+BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 # Intents allow the bot to access more events and data
 default_intents = discord.Intents.default()

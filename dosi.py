@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+import os
 
 # Configure intents
 intents = discord.Intents.default()
@@ -10,8 +11,11 @@ intents.message_content = True  # For processing message commands (optional)
 
 # Set up the bot
 bot = commands.Bot(command_prefix="!", intents=intents)
-# Replace with your bot token
-BOT_TOKEN = 'YOUR_BOT_TOKEN'
+# Get bot token from environment variable
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN environment variable is not set")
+
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user}!')
@@ -160,7 +164,7 @@ async def create_categories_with_channels(ctx, *args):
                 created_channels.append(channel.name)
                 print(f"Created channel: {channel_name} in category {category_name}")
 
-            await ctx.send(f'Category "{category_name}" with channels "{', '.join(created_channels)}" created for roles "{', '.join(roles)}".')
+            await ctx.send(f'Category "{category_name}" with channels "{", ".join(created_channels)}" created for roles "{", ".join(roles)}".')
     except Exception as e:
         await ctx.send(f'Error creating categories or channels: {e}')
         print(f"Error: {e}")

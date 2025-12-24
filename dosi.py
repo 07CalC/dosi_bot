@@ -164,21 +164,40 @@ async def add_roles_to_channels(ctx, *args):
         else:
             # No channels specified - use all channels below the command channel
             command_channel = ctx.channel
-            command_position = command_channel.position
             
             # Get all text channels in the same category (or no category if command is outside categories)
             if command_channel.category:
-                # In a category - get channels in same category below this one
-                target_channels = [
+                # In a category - get channels in same category, sort by position, then filter for those below
+                category_channels = [
                     ch for ch in command_channel.category.channels 
-                    if isinstance(ch, discord.TextChannel) and ch.position > command_position
+                    if isinstance(ch, discord.TextChannel)
                 ]
+                # Sort channels by position to get correct order
+                category_channels.sort(key=lambda ch: ch.position)
+                
+                # Find the index of the command channel
+                try:
+                    command_index = category_channels.index(command_channel)
+                    # Get all channels after this index (below in the list)
+                    target_channels = category_channels[command_index + 1:]
+                except ValueError:
+                    target_channels = []
             else:
                 # Not in a category - get all channels below this position (that are also not in categories)
-                target_channels = [
+                guild_channels = [
                     ch for ch in ctx.guild.text_channels 
-                    if ch.category is None and ch.position > command_position
+                    if ch.category is None
                 ]
+                # Sort channels by position
+                guild_channels.sort(key=lambda ch: ch.position)
+                
+                # Find the index of the command channel
+                try:
+                    command_index = guild_channels.index(command_channel)
+                    # Get all channels after this index
+                    target_channels = guild_channels[command_index + 1:]
+                except ValueError:
+                    target_channels = []
             
             if not target_channels:
                 await ctx.send("No channels found below the current channel.")

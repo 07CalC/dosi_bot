@@ -151,24 +151,79 @@ async def add_roles_to_channels(ctx, *args):
 
         # Determine target channels
         target_channels = []
+        command_channel = ctx.channel
+        
+        # Debug: Print command channel info
+        print(f"Command channel: {command_channel.name} (ID: {command_channel.id}, Position: {command_channel.position})")
         
         if channel_names:
-            # User specified channels - use those
+            # User specified channel names - find matching channels that are below the command channel
+            
+            # First, get all channels below the command channel
+            channels_below = []
+            
+            if command_channel.category:
+                # In a category - get channels in same category below this one
+                category_channels = [
+                    ch for ch in command_channel.category.channels 
+                    if isinstance(ch, discord.TextChannel)
+                ]
+                # Sort channels by position to get correct order
+                category_channels.sort(key=lambda ch: ch.position)
+                
+                # Debug: Print all channels in category with their positions
+                print(f"Category: {command_channel.category.name}")
+                for i, ch in enumerate(category_channels):
+                    marker = " <- COMMAND CHANNEL" if ch == command_channel else ""
+                    print(f"  Index {i}: {ch.name} (Position: {ch.position}){marker}")
+                
+                # Find the index of the command channel
+                try:
+                    command_index = category_channels.index(command_channel)
+                    print(f"Command channel index: {command_index}")
+                    # Get all channels after this index (below in the list)
+                    channels_below = category_channels[command_index + 1:]
+                except ValueError:
+                    channels_below = []
+                    print("Command channel not found in category channels")
+            else:
+                # Not in a category - get all channels below this position (that are also not in categories)
+                guild_channels = [
+                    ch for ch in ctx.guild.text_channels 
+                    if ch.category is None
+                ]
+                # Sort channels by position
+                guild_channels.sort(key=lambda ch: ch.position)
+                
+                # Debug: Print all channels
+                print("Channels outside categories:")
+                for i, ch in enumerate(guild_channels):
+                    marker = " <- COMMAND CHANNEL" if ch == command_channel else ""
+                    print(f"  Index {i}: {ch.name} (Position: {ch.position}){marker}")
+                
+                # Find the index of the command channel
+                try:
+                    command_index = guild_channels.index(command_channel)
+                    print(f"Command channel index: {command_index}")
+                    # Get all channels after this index
+                    channels_below = guild_channels[command_index + 1:]
+                except ValueError:
+                    channels_below = []
+                    print("Command channel not found in guild channels")
+            
+            print(f"All channels below command channel: {[ch.name for ch in channels_below]}")
+            
+            # Now filter for channels matching the specified names
             for channel_name in channel_names:
-                matching_channels = [ch for ch in ctx.guild.channels if ch.name == channel_name]
+                matching_channels = [ch for ch in channels_below if ch.name == channel_name]
                 target_channels.extend(matching_channels)
+                print(f"Channels named '{channel_name}' below command channel: {[ch.name for ch in matching_channels]}")
             
             if not target_channels:
-                await ctx.send(f'No matching channels found for: {", ".join(channel_names)}')
+                await ctx.send(f'No channels named {", ".join(channel_names)} found below the command channel.')
                 return
         else:
             # No channels specified - use all channels below the command channel
-            command_channel = ctx.channel
-            
-            # Debug: Print command channel info
-            print(f"Command channel: {command_channel.name} (ID: {command_channel.id}, Position: {command_channel.position})")
-            
-            # Get all text channels in the same category (or no category if command is outside categories)
             if command_channel.category:
                 # In a category - get channels in same category, sort by position, then filter for those below
                 category_channels = [
@@ -181,7 +236,8 @@ async def add_roles_to_channels(ctx, *args):
                 # Debug: Print all channels in category with their positions
                 print(f"Category: {command_channel.category.name}")
                 for i, ch in enumerate(category_channels):
-                    print(f"  Index {i}: {ch.name} (Position: {ch.position})")
+                    marker = " <- COMMAND CHANNEL" if ch == command_channel else ""
+                    print(f"  Index {i}: {ch.name} (Position: {ch.position}){marker}")
                 
                 # Find the index of the command channel
                 try:
@@ -205,7 +261,8 @@ async def add_roles_to_channels(ctx, *args):
                 # Debug: Print all channels
                 print("Channels outside categories:")
                 for i, ch in enumerate(guild_channels):
-                    print(f"  Index {i}: {ch.name} (Position: {ch.position})")
+                    marker = " <- COMMAND CHANNEL" if ch == command_channel else ""
+                    print(f"  Index {i}: {ch.name} (Position: {ch.position}){marker}")
                 
                 # Find the index of the command channel
                 try:

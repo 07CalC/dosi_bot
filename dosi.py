@@ -116,7 +116,9 @@ async def remove_role(ctx, role_name, *usernames):
 @bot.command()
 @commands.has_permissions(manage_channels=True)
 async def add_roles_to_channels(ctx, *args):
-    """Adds role permissions to multiple channels. Usage: !add_roles_to_channels -r role1 role2 -ch channel1 channel2"""
+    """Adds role permissions to multiple channels. 
+    Usage: !add_roles_to_channels -r role1 role2 [-ch channel1 channel2]
+    If -ch is omitted, roles will be added to all channels below the command channel."""
     try:
         roles = []
         channel_names = []
@@ -133,8 +135,8 @@ async def add_roles_to_channels(ctx, *args):
             elif flag == "-ch":
                 channel_names.append(arg)
 
-        if not roles or not channel_names:
-            await ctx.send("Please specify roles (-r) and channels (-ch). Example: !add_roles_to_channels -r role1 role2 -ch announcement discussion")
+        if not roles:
+            await ctx.send("Please specify roles (-r). Example: !add_roles_to_channels -r role1 role2 [-ch channel1 channel2]")
             return
 
         # Get role objects
@@ -147,29 +149,55 @@ async def add_roles_to_channels(ctx, *args):
                 await ctx.send(f'Role not found: {role_name}')
                 return
 
-        # Process each channel (handle multiple channels with same name)
-        updated_channel_names = []
-        not_found_channels = []
+        # Determine target channels
+        target_channels = []
+        
+        if channel_names:
+            # User specified channels - use those
+            for channel_name in channel_names:
+                matching_channels = [ch for ch in ctx.guild.channels if ch.name == channel_name]
+                target_channels.extend(matching_channels)
+            
+            if not target_channels:
+                await ctx.send(f'No matching channels found for: {", ".join(channel_names)}')
+                return
+        else:
+            # No channels specified - use all channels below the command channel
+            command_channel = ctx.channel
+            command_position = command_channel.position
+            
+            # Get all text channels in the same category (or no category if command is outside categories)
+            if command_channel.category:
+                # In a category - get channels in same category below this one
+                target_channels = [
+                    ch for ch in command_channel.category.channels 
+                    if isinstance(ch, discord.TextChannel) and ch.position > command_position
+                ]
+            else:
+                # Not in a category - get all channels below this position (that are also not in categories)
+                target_channels = [
+                    ch for ch in ctx.guild.text_channels 
+                    if ch.category is None and ch.position > command_position
+                ]
+            
+            if not target_channels:
+                await ctx.send("No channels found below the current channel.")
+                return
+
+        # Apply permissions to target channels
+        updated_channels = []
         total_channels_updated = 0
         
-        for channel_name in channel_names:
-            # Find all channels with this name
-            matching_channels = [ch for ch in ctx.guild.channels if ch.name == channel_name]
-            
-            if matching_channels:
-                for channel in matching_channels:
-                    for role in role_objects:
-                        await channel.set_permissions(role, view_channel=True, send_messages=True)
-                        print(f"Added role {role.name} to channel {channel_name} (ID: {channel.id})")
-                    total_channels_updated += 1
-                updated_channel_names.append(f"{channel_name} ({len(matching_channels)} channel(s))")
-            else:
-                not_found_channels.append(channel_name)
+        for channel in target_channels:
+            for role in role_objects:
+                await channel.set_permissions(role, view_channel=True, send_messages=True)
+                print(f"Added role {role.name} to channel {channel.name} (ID: {channel.id})")
+            updated_channels.append(channel.name)
+            total_channels_updated += 1
 
-        if updated_channel_names:
-            await ctx.send(f'Roles {", ".join(roles)} added to: {", ".join(updated_channel_names)} - Total: {total_channels_updated} channel(s) updated')
-        if not_found_channels:
-            await ctx.send(f'Channels not found: {", ".join(not_found_channels)}')
+        if updated_channels:
+            channel_list = ", ".join(updated_channels)
+            await ctx.send(f'Roles {", ".join(roles)} added to {total_channels_updated} channel(s): {channel_list}')
     except Exception as e:
         await ctx.send(f'Error adding roles to channels: {e}')
         print(f"Error: {e}")

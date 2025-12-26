@@ -337,6 +337,110 @@ async def delete_roles_from_channels(ctx, *args):
 
 @bot.command()
 @commands.has_permissions(manage_channels=True)
+async def remove_messaging_permissions(ctx, *args):
+    """Removes message sending and thread creation permissions from a role in specified channels.
+    Only modifies channels where the role already has explicit permissions.
+    Usage: !remove_messaging_permissions -r role_name -ch channel1 channel2"""
+    try:
+        role_name = None
+        channel_names = []
+
+        # Parse arguments
+        args_list = list(args)
+        flag = None
+
+        for arg in args_list:
+            if arg.startswith("-"):
+                flag = arg
+            elif flag == "-r":
+                role_name = arg
+                flag = None  # Only take first role name
+            elif flag == "-ch":
+                channel_names.append(arg)
+
+        if not role_name or not channel_names:
+            await ctx.send("Please specify a role (-r) and channels (-ch). Example: !remove_messaging_permissions -r Student -ch announcement")
+            return
+
+        # Get role object
+        role = discord.utils.get(ctx.guild.roles, name=role_name)
+        if not role:
+            await ctx.send(f'Role not found: {role_name}')
+            return
+
+        # Process each channel name (handle multiple channels with same name)
+        updated_channels = []
+        skipped_channels = []
+        not_found_channels = set()
+        total_channels_updated = 0
+        
+        for channel_name in channel_names:
+            # Find all text channels with this name
+            matching_channels = [ch for ch in ctx.guild.text_channels if ch.name == channel_name]
+            
+            if not matching_channels:
+                not_found_channels.add(channel_name)
+                continue
+            
+            for channel in matching_channels:
+                # Check if role has explicit permissions in this channel
+                role_overwrite = channel.overwrites_for(role)
+                
+                # Check if the role has any explicit permissions set (not default/None)
+                has_explicit_perms = any([
+                    role_overwrite.view_channel is not None,
+                    role_overwrite.send_messages is not None,
+                    role_overwrite.create_public_threads is not None,
+                    role_overwrite.create_private_threads is not None,
+                    role_overwrite.send_messages_in_threads is not None
+                ])
+                
+                if has_explicit_perms:
+                    # Role has explicit permissions, update them to deny messaging
+                    await channel.set_permissions(
+                        role,
+                        send_messages=False,
+                        create_public_threads=False,
+                        create_private_threads=False,
+                        send_messages_in_threads=False
+                    )
+                    updated_channels.append(f"{channel.name} (ID: {channel.id})")
+                    total_channels_updated += 1
+                    print(f"Removed messaging permissions for role {role.name} from channel {channel.name} (ID: {channel.id})")
+                else:
+                    # Role doesn't have explicit permissions, skip it
+                    skipped_channels.append(f"{channel.name} (ID: {channel.id})")
+                    print(f"Skipped channel {channel.name} (ID: {channel.id}) - role {role.name} has no explicit permissions")
+
+        # Send feedback
+        response_parts = []
+        
+        if updated_channels:
+            response_parts.append(f'Removed messaging permissions for role "{role_name}" from {total_channels_updated} channel(s): {", ".join(updated_channels)}')
+        
+        if skipped_channels:
+            response_parts.append(f'Skipped {len(skipped_channels)} channel(s) where role has no explicit permissions: {", ".join(skipped_channels)}')
+        
+        if not_found_channels:
+            response_parts.append(f'Channels not found: {", ".join(not_found_channels)}')
+        
+        if not response_parts:
+            await ctx.send(f'No channels were updated.')
+        else:
+            # Send response in chunks if too long
+            full_response = '\n'.join(response_parts)
+            if len(full_response) > 2000:
+                for part in response_parts:
+                    await ctx.send(part)
+            else:
+                await ctx.send(full_response)
+                
+    except Exception as e:
+        await ctx.send(f'Error removing messaging permissions: {e}')
+        print(f"Error: {e}")
+
+@bot.command()
+@commands.has_permissions(manage_channels=True)
 async def create_categories_with_channels(ctx, *args):
     """Creates multiple categories with specific channels accessible only to specific roles."""
     try:

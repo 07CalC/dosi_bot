@@ -242,9 +242,11 @@ async def delete_roles_from_channels(ctx, *args):
 @bot.command()
 @commands.has_permissions(manage_channels=True)
 async def remove_messaging_permissions(ctx, *args):
-    """Removes message sending and thread creation permissions from a role in specified channels.
+    """Makes specified channels read-only for a given role (removes send/thread permissions, keeps view permission).
     Only modifies channels where the role already has explicit permissions.
-    Usage: !remove_messaging_permissions -r role_name -ch channel1 channel2"""
+    Supports duplicate channel names - will update all channels with the same name.
+    Usage: !remove_messaging_permissions -r role_name -ch channel1 channel2
+    Example: !remove_messaging_permissions -r Student -ch announcement general-info"""
     try:
         role_name = None
         channel_names = []
@@ -300,9 +302,13 @@ async def remove_messaging_permissions(ctx, *args):
                 ])
                 
                 if has_explicit_perms:
-                    # Role has explicit permissions, update them to deny messaging
+                    # Role has explicit permissions, keep view_channel but deny messaging
+                    # Get current overwrites to preserve view_channel setting
+                    current_overwrites = channel.overwrites_for(role)
+                    
                     await channel.set_permissions(
                         role,
+                        view_channel=current_overwrites.view_channel if current_overwrites.view_channel is not None else True,
                         send_messages=False,
                         create_public_threads=False,
                         create_private_threads=False,
@@ -310,7 +316,7 @@ async def remove_messaging_permissions(ctx, *args):
                     )
                     updated_channels.append(f"{channel.name} (ID: {channel.id})")
                     total_channels_updated += 1
-                    print(f"Removed messaging permissions for role {role.name} from channel {channel.name} (ID: {channel.id})")
+                    print(f"Made channel {channel.name} (ID: {channel.id}) read-only for role {role.name}")
                 else:
                     # Role doesn't have explicit permissions, skip it
                     skipped_channels.append(f"{channel.name} (ID: {channel.id})")
@@ -320,7 +326,7 @@ async def remove_messaging_permissions(ctx, *args):
         response_parts = []
         
         if updated_channels:
-            response_parts.append(f'Removed messaging permissions for role "{role_name}" from {total_channels_updated} channel(s): {", ".join(updated_channels)}')
+            response_parts.append(f'Made {total_channels_updated} channel(s) read-only for role "{role_name}": {", ".join(updated_channels)}')
         
         if skipped_channels:
             response_parts.append(f'Skipped {len(skipped_channels)} channel(s) where role has no explicit permissions: {", ".join(skipped_channels)}')
@@ -340,7 +346,7 @@ async def remove_messaging_permissions(ctx, *args):
                 await ctx.send(full_response)
                 
     except Exception as e:
-        await ctx.send(f'Error removing messaging permissions: {e}')
+        await ctx.send(f'Error making channels read-only: {e}')
         print(f"Error: {e}")
 
 @bot.command()

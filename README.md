@@ -12,6 +12,7 @@ This document provides a detailed list of available commands, flags, and sample 
 | `!remove_role`                        | Removes a specific role from one or more users.               | None                                   | `!remove_role Moderator John Jane` |
 | `!add_roles_to_channels`              | Adds role permissions to multiple channels at once.           | `-r` (roles), `-ch` (channels)        | `!add_roles_to_channels -r Admin Moderator -ch announcement discussion` |
 | `!delete_roles_from_channels`         | Removes role permissions from multiple channels at once.      | `-r` (roles), `-ch` (channels)        | `!delete_roles_from_channels -r Guest -ch private-chat staff-only` |
+| `!remove_messaging_permissions`       | Makes specified channels read-only for a role.                | `-r` (role), `-ch` (channels)         | `!remove_messaging_permissions -r Student -ch announcement general-info` |
 | `!create_categories_with_channels`    | Creates categories and channels with role-based permissions.  | `-m` (categories), `-r` (roles), `-ch` (channels) | `!create_categories_with_channels -m AdminCategory -r Admin Moderator -ch General Chat` |
 
 ## Explanation of Flags
@@ -78,6 +79,39 @@ Removes role permissions from multiple existing channels. This command removes t
 **Special Feature:**
 - Like `!add_roles_to_channels`, this command also handles multiple channels with the same name.
 - It will remove permissions from **all** channels matching the provided names.
+
+### `!remove_messaging_permissions`
+Makes specified channels read-only for a given role. This command removes the ability to send messages and create threads while preserving the role's ability to view and read messages in the channel.
+
+**Flags:**
+- **`-r` (Role)**: Specifies the role to make channels read-only for (single role only).
+  - **Example**: `-r Student`
+- **`-ch` (Channels)**: Specifies the channels to make read-only.
+  - **Example**: `-ch announcement general-info rules`
+
+**Usage:**
+```
+!remove_messaging_permissions -r role_name -ch channel1 channel2 channel3
+```
+
+**Examples:**
+```
+!remove_messaging_permissions -r Student -ch announcement
+!remove_messaging_permissions -r Guest -ch rules general-info announcements
+```
+
+**Special Features:**
+- **Only modifies existing permissions**: The command only updates channels where the role already has explicit permissions set. If the role doesn't have explicit permissions in a channel, it will be skipped.
+- **Supports duplicate channel names**: If you have multiple channels with the same name (e.g., "announcement" in different categories), this command will update **all** of them.
+- **Preserves view access**: The role will retain its ability to view and read the channel, but won't be able to send messages or create/participate in threads.
+- **Removes these permissions**:
+  - Send messages
+  - Create public threads
+  - Create private threads
+  - Send messages in threads
+
+**Use Case Example:**
+If you run `!remove_messaging_permissions -r Student -ch announcement`, all channels named "announcement" where the "Student" role has explicit permissions will become read-only for students. They can still see and read announcements, but cannot post or create threads.
 
 ## Detailed Example Input
 
